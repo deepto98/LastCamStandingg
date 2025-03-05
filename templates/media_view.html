@@ -30,12 +30,12 @@
                     <span class="value expiration-countdown" data-expiration="{{ media.expiration_time.isoformat() }}"></span>
                 </div>
             </div>
-            <div class="actions">
+            <div class="d-grid gap-3">
                 <a href="{{ url_for('get_media', media_id=media.id) }}" download class="btn btn-primary">
-                    <i class="fas fa-download"></i> Download
+                    <i class="fas fa-download me-2"></i> Download
                 </a>
                 <a href="{{ url_for('gallery') }}" class="btn btn-outline-primary">
-                    <i class="fas fa-images"></i> Back to Gallery
+                    <i class="fas fa-arrow-left me-2"></i> Back to Gallery
                 </a>
             </div>
         </div>
