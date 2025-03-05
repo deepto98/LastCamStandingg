@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 import logging
+from threading import Lock
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -27,6 +28,27 @@ UPLOAD_FOLDER = 'uploads'
 MAX_STORAGE_PER_IP = 100 * 1024 * 1024  # 100MB
 EXPIRATION_HOURS = 24
 
+# Global storage tracker with thread safety
+storage_tracker = {}
+storage_lock = Lock()
+
+def update_storage_usage(ip_address, file_size, action='add'):
+    """
+    Update storage usage for an IP address
+    action: 'add' or 'remove'
+    """
+    with storage_lock:
+        current_usage = storage_tracker.get(ip_address, 0)
+        if action == 'add':
+            storage_tracker[ip_address] = current_usage + file_size
+        else:  # remove
+            storage_tracker[ip_address] = max(0, current_usage - file_size)
+
+def get_storage_usage(ip_address):
+    """Get current storage usage for an IP address"""
+    with storage_lock:
+        return storage_tracker.get(ip_address, 0)
+
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -47,12 +69,11 @@ def upload_media():
     media_type = request.form.get('type', 'image')
     client_ip = request.remote_addr
 
-    # Check storage quota
-    used_storage = db.session.query(db.func.sum(MediaFile.file_size))\
-        .filter_by(ip_address=client_ip)\
-        .scalar() or 0
+    # Check storage quota using the storage tracker
+    current_usage = get_storage_usage(client_ip)
+    file_size = len(file.read())
 
-    if used_storage + len(file.read()) > MAX_STORAGE_PER_IP:
+    if current_usage + file_size > MAX_STORAGE_PER_IP:
         return jsonify({'error': 'Storage quota exceeded'}), 400
 
     file.seek(0)  # Reset file pointer after reading
@@ -70,12 +91,15 @@ def upload_media():
         file_path=file_path,
         media_type=media_type,
         ip_address=client_ip,
-        file_size=os.path.getsize(file_path),
+        file_size=file_size,
         expiration_time=datetime.now() + timedelta(hours=EXPIRATION_HOURS)
     )
 
     db.session.add(media_file)
     db.session.commit()
+
+    # Update storage tracker
+    update_storage_usage(client_ip, file_size, 'add')
 
     return jsonify({
         'id': media_file.id,
@@ -90,10 +114,8 @@ def get_media_list():
     client_ip = request.remote_addr
     media_ids = request.args.getlist('ids[]')
 
-    # Get total storage used by IP (always calculate this regardless of media_ids)
-    total_storage = db.session.query(db.func.sum(MediaFile.file_size))\
-        .filter_by(ip_address=client_ip)\
-        .scalar() or 0
+    # Get storage usage from tracker
+    current_usage = get_storage_usage(client_ip)
 
     # Get media files by IDs if provided
     media_files = []
@@ -115,9 +137,9 @@ def get_media_list():
             'expiration_time': media.expiration_time.isoformat()
         } for media in media_files],
         'storage': {
-            'used': total_storage,
+            'used': current_usage,
             'total': MAX_STORAGE_PER_IP,
-            'percentage': (total_storage / MAX_STORAGE_PER_IP) * 100
+            'percentage': (current_usage / MAX_STORAGE_PER_IP) * 100
         }
     })
 
@@ -130,13 +152,16 @@ def get_media(media_id):
 
     return send_file(media.file_path)
 
-# Cleanup expired files
+# Cleanup expired files and update storage tracker
 @app.before_request
 def cleanup_expired():
     expired_files = MediaFile.query.filter(MediaFile.expiration_time < datetime.now()).all()
 
     for media in expired_files:
         try:
+            # Update storage tracker before deleting
+            update_storage_usage(media.ip_address, media.file_size, 'remove')
+
             os.remove(media.file_path)
             db.session.delete(media)
         except OSError:
@@ -144,5 +169,11 @@ def cleanup_expired():
 
     db.session.commit()
 
+# Initialize storage tracker with existing files
 with app.app_context():
     db.create_all()
+
+    # Initialize storage tracker with existing files
+    active_files = MediaFile.query.filter(MediaFile.expiration_time > datetime.now()).all()
+    for media in active_files:
+        update_storage_usage(media.ip_address, media.file_size, 'add')
