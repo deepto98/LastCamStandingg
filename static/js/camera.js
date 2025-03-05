@@ -109,10 +109,16 @@ class CameraApp {
             this.videoElement.insertAdjacentHTML('afterend',
                 '<div id="cameraLoader" class="camera-loader">Accessing camera...</div>');
 
+            // Calculate aspect ratio based on screen orientation
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const aspectRatio = isPortrait ? 3/4 : 16/9;
+
             const constraints = {
                 video: {
-                    facingMode: { exact: this.currentFacingMode },
-                    aspectRatio: window.innerHeight > window.innerWidth ? 3/4 : 16/9
+                    facingMode: this.currentFacingMode, // Use preference instead of exact constraint
+                    aspectRatio: aspectRatio,
+                    width: { ideal: isPortrait ? 1080 : 1920 },
+                    height: { ideal: isPortrait ? 1440 : 1080 }
                 },
                 audio: true
             };
@@ -138,7 +144,6 @@ class CameraApp {
             };
 
         } catch (error) {
-            console.error('Camera access error:', error);
             let errorMessage = 'Unable to access camera.';
 
             switch (error.name) {
@@ -157,7 +162,7 @@ class CameraApp {
                     await this.initializeWithFallback();
                     return;
             }
-            this.showCameraPlaceholder(errorMessage);
+            this.showError(errorMessage);
         }
     }
 
@@ -165,7 +170,9 @@ class CameraApp {
         try {
             // Basic constraints as fallback
             const fallbackConstraints = {
-                video: true,
+                video: {
+                    facingMode: this.currentFacingMode
+                },
                 audio: true
             };
             this.stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
@@ -176,8 +183,12 @@ class CameraApp {
             this.recordBtn.disabled = false;
         } catch (error) {
             console.error('Fallback camera access failed:', error);
-            this.showCameraPlaceholder('Could not access camera with fallback options.');
+            this.showError('Could not access camera with fallback options.');
         }
+    }
+
+    showError(errorMessage){
+        this.showCameraPlaceholder(errorMessage);
     }
 
     setupEventListeners() {
