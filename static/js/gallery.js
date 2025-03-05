@@ -2,6 +2,7 @@ class Gallery {
     constructor() {
         this.galleryContainer = document.getElementById('galleryGrid');
         this.storageBar = document.getElementById('storageBar');
+        this.mediaIds = this.getStoredMediaIds();
         this.loadMedia();
         this.setupRefresh();
     }
@@ -10,24 +11,59 @@ class Gallery {
         setInterval(() => this.loadMedia(), 30000); // Refresh every 30 seconds
     }
 
+    getStoredMediaIds() {
+        try {
+            return JSON.parse(localStorage.getItem('lastCamMedia') || '[]');
+        } catch (e) {
+            console.error('Error reading from localStorage:', e);
+            return [];
+        }
+    }
+
+    storeMediaId(id) {
+        try {
+            const ids = this.getStoredMediaIds();
+            if (!ids.includes(id)) {
+                ids.push(id);
+                localStorage.setItem('lastCamMedia', JSON.stringify(ids));
+            }
+        } catch (e) {
+            console.error('Error storing in localStorage:', e);
+        }
+    }
+
     async loadMedia() {
         try {
-            const response = await fetch('/api/media');
-            const mediaFiles = await response.json();
-            this.renderGallery(mediaFiles);
-            this.updateStorageBar(mediaFiles);
+            const params = new URLSearchParams();
+            this.mediaIds.forEach(id => params.append('ids[]', id));
+
+            const response = await fetch(`/api/media?${params.toString()}`);
+            const data = await response.json();
+
+            // Update UI with media files and storage info
+            this.renderGallery(data.files);
+            this.updateStorageBar(data.storage);
+
+            // Clean up expired media from localStorage
+            this.cleanupExpiredMedia(data.files);
         } catch (error) {
             console.error('Error loading media:', error);
         }
     }
 
+    cleanupExpiredMedia(activeFiles) {
+        const activeIds = activeFiles.map(file => file.id);
+        this.mediaIds = this.mediaIds.filter(id => activeIds.includes(id));
+        localStorage.setItem('lastCamMedia', JSON.stringify(this.mediaIds));
+    }
+
     renderGallery(mediaFiles) {
         this.galleryContainer.innerHTML = '';
-        
+
         mediaFiles.forEach(media => {
             const expirationTime = new Date(media.expiration_time);
             const timeLeft = this.getTimeLeft(expirationTime);
-            
+
             const card = document.createElement('div');
             card.className = 'media-card';
             card.innerHTML = `
@@ -49,7 +85,7 @@ class Gallery {
                     </div>
                 </div>
             `;
-            
+
             this.galleryContainer.appendChild(card);
         });
 
@@ -69,19 +105,36 @@ class Gallery {
         const diff = expirationTime - now;
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        
+
         if (hours <= 0 && minutes <= 0) return 'Expired';
         return `${hours}h ${minutes}m left`;
     }
 
-    updateStorageBar(mediaFiles) {
-        const totalSize = mediaFiles.reduce((acc, media) => acc + media.size, 0);
-        const percentage = (totalSize / (100 * 1024 * 1024)) * 100;
-        
+    updateStorageBar(storage) {
+        const percentage = Math.min(storage.percentage, 100);
         this.storageBar.style.width = `${percentage}%`;
         this.storageBar.setAttribute('aria-valuenow', percentage);
+
+        // Update the storage text
+        const usedMB = (storage.used / (1024 * 1024)).toFixed(1);
+        const totalMB = (storage.total / (1024 * 1024)).toFixed(1);
+        document.querySelector('.storage-meter small').textContent = 
+            `${usedMB}MB used of ${totalMB}MB limit`;
     }
 }
+
+// Add this to camera.js success handler
+window.storeMediaId = function(id) {
+    try {
+        const ids = JSON.parse(localStorage.getItem('lastCamMedia') || '[]');
+        if (!ids.includes(id)) {
+            ids.push(id);
+            localStorage.setItem('lastCamMedia', JSON.stringify(ids));
+        }
+    } catch (e) {
+        console.error('Error storing media ID:', e);
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     new Gallery();

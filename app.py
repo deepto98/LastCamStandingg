@@ -54,16 +54,16 @@ def upload_media():
 
     if used_storage + len(file.read()) > MAX_STORAGE_PER_IP:
         return jsonify({'error': 'Storage quota exceeded'}), 400
-    
+
     file.seek(0)  # Reset file pointer after reading
 
     # Generate unique filename
     filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}"
     file_path = os.path.join(UPLOAD_FOLDER, filename)
-    
+
     # Save file
     file.save(file_path)
-    
+
     # Create database entry
     media_file = MediaFile(
         filename=filename,
@@ -73,48 +73,73 @@ def upload_media():
         file_size=os.path.getsize(file_path),
         expiration_time=datetime.now() + timedelta(hours=EXPIRATION_HOURS)
     )
-    
+
     db.session.add(media_file)
     db.session.commit()
 
     return jsonify({
         'id': media_file.id,
-        'url': f'/media/{media_file.id}'
+        'url': f'/media/{media_file.id}',
+        'type': media_type,
+        'size': media_file.file_size,
+        'expiration_time': media_file.expiration_time.isoformat()
     })
 
 @app.route('/api/media')
 def get_media_list():
     client_ip = request.remote_addr
-    media_files = MediaFile.query.filter_by(ip_address=client_ip).all()
-    
-    return jsonify([{
-        'id': media.id,
-        'type': media.media_type,
-        'url': f'/media/{media.id}',
-        'expiration_time': media.expiration_time.isoformat()
-    } for media in media_files])
+    media_ids = request.args.getlist('ids[]')
+
+    # Get total storage used by IP
+    total_storage = db.session.query(db.func.sum(MediaFile.file_size))\
+        .filter_by(ip_address=client_ip)\
+        .scalar() or 0
+
+    # Get media files either by IDs (if provided) or by IP
+    query = MediaFile.query
+    if media_ids:
+        query = query.filter(MediaFile.id.in_([int(id) for id in media_ids]))
+    else:
+        query = query.filter_by(ip_address=client_ip)
+
+    media_files = query.all()
+
+    return jsonify({
+        'files': [{
+            'id': media.id,
+            'type': media.media_type,
+            'url': f'/media/{media.id}',
+            'size': media.file_size,
+            'expiration_time': media.expiration_time.isoformat()
+        } for media in media_files],
+        'storage': {
+            'used': total_storage,
+            'total': MAX_STORAGE_PER_IP,
+            'percentage': (total_storage / MAX_STORAGE_PER_IP) * 100
+        }
+    })
 
 @app.route('/media/<int:media_id>')
 def get_media(media_id):
     media = MediaFile.query.get_or_404(media_id)
-    
+
     if datetime.now() > media.expiration_time:
         return jsonify({'error': 'Media has expired'}), 410
-    
+
     return send_file(media.file_path)
 
 # Cleanup expired files
 @app.before_request
 def cleanup_expired():
     expired_files = MediaFile.query.filter(MediaFile.expiration_time < datetime.now()).all()
-    
+
     for media in expired_files:
         try:
             os.remove(media.file_path)
             db.session.delete(media)
         except OSError:
             pass
-    
+
     db.session.commit()
 
 with app.app_context():

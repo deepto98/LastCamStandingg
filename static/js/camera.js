@@ -32,7 +32,7 @@ class CameraApp {
             // Show loading state
             this.videoElement.style.backgroundColor = '#333';
             this.videoElement.style.position = 'relative';
-            this.videoElement.insertAdjacentHTML('afterend', 
+            this.videoElement.insertAdjacentHTML('afterend',
                 '<div id="cameraLoader" class="camera-loader">Accessing camera...</div>');
 
             const constraints = {
@@ -46,6 +46,7 @@ class CameraApp {
 
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.videoElement.srcObject = this.stream;
+            this.videoElement.muted = true; // Mute the video element to prevent audio feedback
 
             // Remove loader on success
             const loader = document.getElementById('cameraLoader');
@@ -222,6 +223,10 @@ class CameraApp {
     }
 
     showSuccess(url) {
+        // Store the media ID in localStorage
+        const mediaId = url.split('/').pop();
+        window.storeMediaId(mediaId);
+
         const toast = document.createElement('div');
         toast.className = 'toast show position-fixed bottom-0 end-0 m-3 bg-success text-white';
         toast.innerHTML = `
