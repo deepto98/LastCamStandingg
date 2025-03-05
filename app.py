@@ -90,20 +90,22 @@ def get_media_list():
     client_ip = request.remote_addr
     media_ids = request.args.getlist('ids[]')
 
-    # Get total storage used by IP
+    # Get total storage used by IP (always calculate this regardless of media_ids)
     total_storage = db.session.query(db.func.sum(MediaFile.file_size))\
         .filter_by(ip_address=client_ip)\
         .scalar() or 0
 
-    # Get media files either by IDs (if provided) or by IP
-    query = MediaFile.query
+    # Get media files by IDs if provided
+    media_files = []
     if media_ids:
-        query = query.filter(MediaFile.id.in_([int(id) for id in media_ids]))
-    else:
-        query = query.filter_by(ip_address=client_ip)
+        try:
+            # Convert IDs to integers and fetch only those files
+            id_list = [int(id) for id in media_ids]
+            media_files = MediaFile.query.filter(MediaFile.id.in_(id_list)).all()
+        except ValueError:
+            return jsonify({'error': 'Invalid media ID format'}), 400
 
-    media_files = query.all()
-
+    # Return both the requested media files and the storage info
     return jsonify({
         'files': [{
             'id': media.id,

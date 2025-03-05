@@ -8,36 +8,51 @@ class CameraApp {
         this.recordedChunks = [];
         this.isRecording = false;
 
-        // Check if we're in a secure context (HTTPS or localhost)
-        if (!window.isSecureContext) {
-            this.showError('Camera access requires HTTPS. Please use a secure connection.');
-            return;
-        }
+        // Disable buttons until camera is initialized
+        this.captureBtn.disabled = true;
+        this.recordBtn.disabled = true;
 
-        this.checkMediaSupport();
-        this.initializeCamera();
-        this.setupEventListeners();
+        this.init();
     }
 
-    checkMediaSupport() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            this.showError('Your browser does not support camera access.');
-            return false;
+    async init() {
+        try {
+            // Check for secure context
+            if (!window.isSecureContext) {
+                throw new Error('Camera access requires HTTPS or localhost');
+            }
+
+            // Check for media devices support
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Your browser does not support camera access');
+            }
+
+            // Check available devices
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (videoDevices.length === 0) {
+                throw new Error('No camera devices found');
+            }
+
+            await this.initializeCamera();
+            this.setupEventListeners();
+        } catch (error) {
+            console.error('Camera initialization error:', error);
+            this.showError(error.message);
         }
-        return true;
     }
 
     async initializeCamera() {
         try {
             // Show loading state
             this.videoElement.style.backgroundColor = '#333';
-            this.videoElement.style.position = 'relative';
             this.videoElement.insertAdjacentHTML('afterend',
                 '<div id="cameraLoader" class="camera-loader">Accessing camera...</div>');
 
             const constraints = {
                 video: {
-                    facingMode: 'environment',
+                    facingMode: { ideal: 'environment' },
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
                 },
@@ -46,18 +61,21 @@ class CameraApp {
 
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.videoElement.srcObject = this.stream;
-            this.videoElement.muted = true; // Mute the video element to prevent audio feedback
+            this.videoElement.muted = true; // Prevent audio feedback
 
-            // Remove loader on success
+            // Remove loader and enable buttons on success
             const loader = document.getElementById('cameraLoader');
             if (loader) loader.remove();
 
-            // Enable buttons
             this.captureBtn.disabled = false;
             this.recordBtn.disabled = false;
 
+            // Handle stream ready state
+            this.videoElement.onloadedmetadata = () => {
+                this.videoElement.play();
+            };
+
         } catch (error) {
-            console.error('Camera access error:', error);
             let errorMessage = 'Unable to access camera.';
 
             switch (error.name) {
@@ -71,9 +89,8 @@ class CameraApp {
                     errorMessage = 'Camera is in use by another application.';
                     break;
                 case 'OverconstrainedError':
-                    errorMessage = 'Could not find a suitable camera. Trying fallback options...';
                     // Try fallback with lower constraints
-                    this.initializeWithFallback();
+                    await this.initializeWithFallback();
                     return;
             }
             this.showError(errorMessage);
@@ -82,13 +99,17 @@ class CameraApp {
 
     async initializeWithFallback() {
         try {
-            // Fallback to basic constraints
+            // Basic constraints as fallback
             const fallbackConstraints = {
                 video: true,
                 audio: true
             };
             this.stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
             this.videoElement.srcObject = this.stream;
+            this.videoElement.muted = true;
+
+            this.captureBtn.disabled = false;
+            this.recordBtn.disabled = false;
         } catch (error) {
             console.error('Fallback camera access failed:', error);
             this.showError('Could not access camera with fallback options.');
@@ -105,6 +126,15 @@ class CameraApp {
                 this.stopRecording();
             }
         });
+
+        // Handle stream ended
+        if (this.stream) {
+            this.stream.getVideoTracks()[0].addEventListener('ended', () => {
+                this.showError('Camera disconnected');
+                this.captureBtn.disabled = true;
+                this.recordBtn.disabled = true;
+            });
+        }
     }
 
     async capturePhoto() {
@@ -113,12 +143,12 @@ class CameraApp {
             return;
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = this.videoElement.videoWidth;
-        canvas.height = this.videoElement.videoHeight;
-        canvas.getContext('2d').drawImage(this.videoElement, 0, 0);
-
         try {
+            const canvas = document.createElement('canvas');
+            canvas.width = this.videoElement.videoWidth;
+            canvas.height = this.videoElement.videoHeight;
+            canvas.getContext('2d').drawImage(this.videoElement, 0, 0);
+
             canvas.toBlob(async (blob) => {
                 await this.uploadMedia(blob, 'image');
             }, 'image/jpeg', 0.95);
@@ -144,9 +174,11 @@ class CameraApp {
     startRecording() {
         try {
             this.recordedChunks = [];
-            this.mediaRecorder = new MediaRecorder(this.stream, {
+            const options = {
                 mimeType: 'video/webm;codecs=vp8,opus'
-            });
+            };
+
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
 
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -172,10 +204,12 @@ class CameraApp {
 
     stopRecording() {
         try {
-            this.mediaRecorder.stop();
-            this.isRecording = false;
-            this.recordBtn.classList.remove('recording');
-            this.recordBtn.innerHTML = '<i class="fas fa-video"></i>';
+            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                this.mediaRecorder.stop();
+                this.isRecording = false;
+                this.recordBtn.classList.remove('recording');
+                this.recordBtn.innerHTML = '<i class="fas fa-video"></i>';
+            }
         } catch (error) {
             console.error('Error stopping recording:', error);
             this.showError('Failed to stop recording');
@@ -225,7 +259,15 @@ class CameraApp {
     showSuccess(url) {
         // Store the media ID in localStorage
         const mediaId = url.split('/').pop();
-        window.storeMediaId(mediaId);
+        try {
+            const ids = JSON.parse(localStorage.getItem('lastCamMedia') || '[]');
+            if (!ids.includes(mediaId)) {
+                ids.push(mediaId);
+                localStorage.setItem('lastCamMedia', JSON.stringify(ids));
+            }
+        } catch (e) {
+            console.error('Error storing media ID:', e);
+        }
 
         const toast = document.createElement('div');
         toast.className = 'toast show position-fixed bottom-0 end-0 m-3 bg-success text-white';
