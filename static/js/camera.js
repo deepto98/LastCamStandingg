@@ -7,6 +7,7 @@ class CameraApp {
         this.mediaRecorder = null;
         this.recordedChunks = [];
         this.isRecording = false;
+        this.currentFacingMode = 'environment'; // Start with rear camera
 
         // Disable buttons until camera is initialized
         this.captureBtn.disabled = true;
@@ -48,17 +49,40 @@ class CameraApp {
                 return;
             }
 
-            // Log selected camera device
-            const selectedDevice = videoDevices[0];
-            console.log('Selected camera device:', selectedDevice.label || 'Unnamed Camera');
+            // Add camera switch button if multiple cameras are available
+            if (videoDevices.length > 1) {
+                this.addCameraSwitchButton();
+            }
 
-            await this.initializeCamera(selectedDevice.deviceId);
+            await this.initializeCamera();
             this.setupEventListeners();
 
         } catch (error) {
             console.error('Camera initialization error:', error);
             this.showCameraPlaceholder(error.message);
         }
+    }
+
+    addCameraSwitchButton() {
+        const controlsDiv = document.querySelector('.camera-controls');
+        const switchBtn = document.createElement('button');
+        switchBtn.id = 'switchCameraBtn';
+        switchBtn.className = 'control-btn';
+        switchBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        switchBtn.onclick = () => this.switchCamera();
+        controlsDiv.appendChild(switchBtn);
+    }
+
+    async switchCamera() {
+        this.currentFacingMode = this.currentFacingMode === 'environment' ? 'user' : 'environment';
+
+        // Stop current stream
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+        }
+
+        // Reinitialize with new facing mode
+        await this.initializeCamera();
     }
 
     showCameraPlaceholder(message) {
@@ -78,7 +102,7 @@ class CameraApp {
         this.videoElement.parentNode.appendChild(placeholder);
     }
 
-    async initializeCamera(deviceId) {
+    async initializeCamera() {
         try {
             // Show loading state
             this.videoElement.style.backgroundColor = '#333';
@@ -87,10 +111,8 @@ class CameraApp {
 
             const constraints = {
                 video: {
-                    deviceId: deviceId ? { exact: deviceId } : undefined,
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
+                    facingMode: { exact: this.currentFacingMode },
+                    aspectRatio: window.innerHeight > window.innerWidth ? 3/4 : 16/9
                 },
                 audio: true
             };

@@ -59,7 +59,19 @@ body {
   overflow: hidden;
   background: var(--bg-secondary);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  aspect-ratio: 16/9;
+}
+
+/* Adjust aspect ratio for different screen orientations */
+@media (orientation: portrait) {
+  .camera-container {
+    aspect-ratio: 3/4;
+  }
+}
+
+@media (orientation: landscape) {
+  .camera-container {
+    aspect-ratio: 16/9;
+  }
 }
 
 #videoElement {
@@ -310,4 +322,24 @@ body {
     padding: 1rem;
     gap: 1rem;
   }
+}
+
+/* Style the new camera switch button */
+#switchCameraBtn {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+#switchCameraBtn:hover {
+  background: var(--accent-primary);
+  transform: rotate(180deg);
+}
+
+/* Add transition for smooth camera switch rotation */
+#switchCameraBtn i {
+  transition: transform 0.3s ease;
+}
+
+#switchCameraBtn:hover i {
+  transform: rotate(180deg);
 }
