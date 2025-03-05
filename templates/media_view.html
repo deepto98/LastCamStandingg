@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="media-view-container">
+    <div class="media-content">
+        {% if media.media_type == 'video' %}
+        <video class="media-preview-large" src="{{ url_for('get_media', media_id=media.id) }}" controls></video>
+        {% else %}
+        <img class="media-preview-large" src="{{ url_for('get_media', media_id=media.id) }}" alt="Media preview">
+        {% endif %}
+    </div>
+    <div class="media-details">
+        <div class="details-card">
+            <h2 class="card-title">Media Information</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Type</span>
+                    <span class="value">{{ media.media_type|title }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">File Size</span>
+                    <span class="value">{{ (media.file_size / 1024)|round(1) }} KB</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Created</span>
+                    <span class="value">{{ media.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Time Left</span>
+                    <span class="value expiration-countdown" data-expiration="{{ media.expiration_time.isoformat() }}"></span>
+                </div>
+            </div>
+            <div class="actions">
+                <a href="{{ url_for('get_media', media_id=media.id) }}" download class="btn btn-primary">
+                    <i class="fas fa-download"></i> Download
+                </a>
+                <a href="{{ url_for('gallery') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-images"></i> Back to Gallery
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateTimeLeft() {
+    const element = document.querySelector('.expiration-countdown');
+    const expirationTime = new Date(element.dataset.expiration);
+    const now = new Date();
+    const diff = expirationTime - now;
+
+    if (diff <= 0) {
+        element.textContent = 'Expired';
+        return;
+    }
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    element.textContent = `${hours}h ${minutes}m left`;
+}
+
+updateTimeLeft();
+setInterval(updateTimeLeft, 60000); // Update every minute
+</script>
+{% endblock %}

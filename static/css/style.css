@@ -4,67 +4,84 @@
     --accent-color: #F6AD55;
     --background-color: #F7FAFC;
     --text-color: #1A202C;
+    --border-radius: 1rem;
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
 }
 
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
+    line-height: 1.6;
 }
 
 .navbar {
     background-color: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-sm);
+    padding: 1rem 0;
 }
 
 .navbar-brand {
     font-weight: 700;
     color: var(--primary-color);
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .camera-container {
     position: relative;
     max-width: 800px;
     margin: 2rem auto;
-    border-radius: 1rem;
+    border-radius: var(--border-radius);
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-lg);
     background-color: #000;
+    transition: transform 0.3s ease;
+    aspect-ratio: 16/9;
+}
+
+.camera-container:hover {
+    transform: translateY(-4px);
 }
 
 #videoElement {
     width: 100%;
     background-color: #000;
     display: block;
-    /* Removing mirror effect */
 }
 
 .camera-controls {
     position: absolute;
-    bottom: 1rem;
+    bottom: 2rem;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     z-index: 10;
 }
 
 .control-btn {
-    width: 60px;
-    height: 60px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     border: none;
     background-color: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-md);
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 1.25rem;
 }
 
 .control-btn:hover {
     transform: scale(1.1);
+    box-shadow: var(--shadow-lg);
 }
 
 .control-btn:disabled {
@@ -75,6 +92,7 @@ body {
 
 .control-btn.capture {
     background-color: var(--accent-color);
+    color: white;
 }
 
 .control-btn.recording {
@@ -109,21 +127,22 @@ body {
 
 .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
     padding: 2rem;
 }
 
 .media-card {
     background: white;
-    border-radius: 0.5rem;
+    border-radius: var(--border-radius);
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
 }
 
 .media-card:hover {
     transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
 }
 
 .media-preview {
@@ -133,35 +152,164 @@ body {
 }
 
 .media-info {
-    padding: 1rem;
+    padding: 1.5rem;
 }
 
 .expiration-badge {
     background-color: var(--primary-color);
     color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 2rem;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
 .storage-meter {
     background-color: white;
-    border-radius: 0.5rem;
-    padding: 1rem;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
     margin: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 .progress {
     height: 0.5rem;
     border-radius: 1rem;
+    background-color: #E2E8F0;
+    margin: 0.75rem 0;
+}
+
+.progress-bar {
+    background-color: var(--primary-color);
+    border-radius: 1rem;
+    transition: width 0.3s ease;
 }
 
 .toast {
     min-width: 300px;
     z-index: 1050;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
 }
 
 .toast .btn-close-white {
     filter: brightness(0) invert(1);
+}
+
+/* Media View Page Styles */
+.media-view-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+.media-content {
+    background: white;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+.media-preview-large {
+    width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    background: #000;
+}
+
+.media-details {
+    position: sticky;
+    top: 2rem;
+}
+
+.details-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--secondary-color);
+}
+
+.info-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--background-color);
+    border-radius: 0.5rem;
+}
+
+.info-item .label {
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+.info-item .value {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+    .media-view-container {
+        grid-template-columns: 1fr;
+    }
+
+    .media-details {
+        position: static;
+    }
+}
+
+/* Camera Placeholder Styles */
+.camera-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.camera-placeholder .btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 2rem;
+    transition: all 0.3s ease;
+}
+
+.camera-placeholder .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.camera-placeholder i {
+    margin-right: 0.5rem;
 }

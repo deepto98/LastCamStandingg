@@ -27,23 +27,58 @@ class CameraApp {
                 throw new Error('Your browser does not support camera access');
             }
 
-            // Check available devices
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            // Check camera permission status
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+            console.log('Camera permission status:', permissionStatus.state);
 
-            if (videoDevices.length === 0) {
-                throw new Error('No camera devices found');
+            if (permissionStatus.state === 'denied') {
+                throw new Error('Camera access denied. Please grant camera permissions in your browser settings and reload the page.');
             }
 
-            await this.initializeCamera();
+            // Log all available devices
+            console.log('Enumerating all media devices...');
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            console.log('All available devices:', devices);
+
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log('Available video devices:', videoDevices);
+
+            if (videoDevices.length === 0) {
+                this.showCameraPlaceholder('No camera detected. Please connect a camera or check your browser settings.');
+                return;
+            }
+
+            // Log selected camera device
+            const selectedDevice = videoDevices[0];
+            console.log('Selected camera device:', selectedDevice.label || 'Unnamed Camera');
+
+            await this.initializeCamera(selectedDevice.deviceId);
             this.setupEventListeners();
+
         } catch (error) {
             console.error('Camera initialization error:', error);
-            this.showError(error.message);
+            this.showCameraPlaceholder(error.message);
         }
     }
 
-    async initializeCamera() {
+    showCameraPlaceholder(message) {
+        this.videoElement.style.display = 'none';
+        const placeholder = document.createElement('div');
+        placeholder.className = 'camera-placeholder';
+        placeholder.innerHTML = `
+            <div class="text-center p-5 bg-dark text-white rounded">
+                <i class="fas fa-camera-slash fa-3x mb-3"></i>
+                <h4>Camera Not Available</h4>
+                <p class="mb-3">${message}</p>
+                <button class="btn btn-primary" onclick="location.reload()">
+                    <i class="fas fa-sync-alt"></i> Try Again
+                </button>
+            </div>
+        `;
+        this.videoElement.parentNode.appendChild(placeholder);
+    }
+
+    async initializeCamera(deviceId) {
         try {
             // Show loading state
             this.videoElement.style.backgroundColor = '#333';
@@ -52,6 +87,7 @@ class CameraApp {
 
             const constraints = {
                 video: {
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
                     facingMode: { ideal: 'environment' },
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
@@ -59,7 +95,10 @@ class CameraApp {
                 audio: true
             };
 
+            console.log('Requesting media with constraints:', constraints);
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('Camera stream obtained successfully');
+
             this.videoElement.srcObject = this.stream;
             this.videoElement.muted = true; // Prevent audio feedback
 
@@ -72,10 +111,12 @@ class CameraApp {
 
             // Handle stream ready state
             this.videoElement.onloadedmetadata = () => {
+                console.log('Video element metadata loaded');
                 this.videoElement.play();
             };
 
         } catch (error) {
+            console.error('Camera access error:', error);
             let errorMessage = 'Unable to access camera.';
 
             switch (error.name) {
@@ -90,10 +131,11 @@ class CameraApp {
                     break;
                 case 'OverconstrainedError':
                     // Try fallback with lower constraints
+                    console.log('Camera constraints not met, trying fallback options...');
                     await this.initializeWithFallback();
                     return;
             }
-            this.showError(errorMessage);
+            this.showCameraPlaceholder(errorMessage);
         }
     }
 
@@ -112,7 +154,7 @@ class CameraApp {
             this.recordBtn.disabled = false;
         } catch (error) {
             console.error('Fallback camera access failed:', error);
-            this.showError('Could not access camera with fallback options.');
+            this.showCameraPlaceholder('Could not access camera with fallback options.');
         }
     }
 
@@ -130,7 +172,7 @@ class CameraApp {
         // Handle stream ended
         if (this.stream) {
             this.stream.getVideoTracks()[0].addEventListener('ended', () => {
-                this.showError('Camera disconnected');
+                this.showCameraPlaceholder('Camera disconnected');
                 this.captureBtn.disabled = true;
                 this.recordBtn.disabled = true;
             });
@@ -139,7 +181,7 @@ class CameraApp {
 
     async capturePhoto() {
         if (!this.stream) {
-            this.showError('Camera not initialized');
+            this.showCameraPlaceholder('Camera not initialized');
             return;
         }
 
@@ -154,13 +196,13 @@ class CameraApp {
             }, 'image/jpeg', 0.95);
         } catch (error) {
             console.error('Error capturing photo:', error);
-            this.showError('Failed to capture photo');
+            this.showCameraPlaceholder('Failed to capture photo');
         }
     }
 
     toggleRecording() {
         if (!this.stream) {
-            this.showError('Camera not initialized');
+            this.showCameraPlaceholder('Camera not initialized');
             return;
         }
 
@@ -198,7 +240,7 @@ class CameraApp {
 
         } catch (error) {
             console.error('Error starting recording:', error);
-            this.showError('Failed to start recording');
+            this.showCameraPlaceholder('Failed to start recording');
         }
     }
 
@@ -212,7 +254,7 @@ class CameraApp {
             }
         } catch (error) {
             console.error('Error stopping recording:', error);
-            this.showError('Failed to stop recording');
+            this.showCameraPlaceholder('Failed to stop recording');
         }
     }
 
@@ -236,28 +278,11 @@ class CameraApp {
             }
         } catch (error) {
             console.error('Upload error:', error);
-            this.showError('Failed to upload media: ' + error.message);
+            this.showCameraPlaceholder('Failed to upload media: ' + error.message);
         }
     }
 
-    showError(message) {
-        const toast = document.createElement('div');
-        toast.className = 'toast show position-fixed bottom-0 end-0 m-3 bg-danger text-white';
-        toast.innerHTML = `
-            <div class="toast-header bg-danger text-white">
-                <strong class="me-auto">Error</strong>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-            </div>
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
-    }
-
     showSuccess(url) {
-        // Store the media ID in localStorage
         const mediaId = url.split('/').pop();
         try {
             const ids = JSON.parse(localStorage.getItem('lastCamMedia') || '[]');
@@ -278,7 +303,9 @@ class CameraApp {
             </div>
             <div class="toast-body">
                 Media uploaded successfully!
-                <a href="${url}" target="_blank" class="btn btn-light btn-sm mt-2">View</a>
+                <a href="/view/${mediaId}" class="btn btn-light btn-sm mt-2">
+                    <i class="fas fa-eye"></i> View Media
+                </a>
             </div>
         `;
         document.body.appendChild(toast);

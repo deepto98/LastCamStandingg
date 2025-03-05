@@ -152,6 +152,16 @@ def get_media(media_id):
 
     return send_file(media.file_path)
 
+@app.route('/view/<int:media_id>')
+def view_media(media_id):
+    media = MediaFile.query.get_or_404(media_id)
+
+    if datetime.now() > media.expiration_time:
+        return jsonify({'error': 'Media has expired'}), 410
+
+    return render_template('media_view.html', media=media)
+
+
 # Cleanup expired files and update storage tracker
 @app.before_request
 def cleanup_expired():
