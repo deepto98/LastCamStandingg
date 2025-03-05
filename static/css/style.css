@@ -138,6 +138,7 @@ body {
     overflow: hidden;
     box-shadow: var(--shadow-sm);
     transition: all 0.3s ease;
+    cursor: pointer;
 }
 
 .media-card:hover {

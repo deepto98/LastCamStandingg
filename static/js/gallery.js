@@ -86,6 +86,9 @@ class Gallery {
 
             const card = document.createElement('div');
             card.className = 'media-card';
+            // Add click handler to navigate to media view page
+            card.onclick = () => window.location.href = `/view/${media.id}`;
+
             card.innerHTML = `
                 <div class="media-preview-container">
                     ${media.type === 'video' 
