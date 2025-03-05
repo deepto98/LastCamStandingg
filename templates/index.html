@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <h1 class="display-4">Capture Moments</h1>
+    <p class="lead text-muted">Take photos and videos without using device storage</p>
+</div>
+
+<div class="camera-container">
+    <video id="videoElement" autoplay playsinline></video>
+    <div class="camera-controls">
+        <button id="captureBtn" class="control-btn capture">
+            <i class="fas fa-camera"></i>
+        </button>
+        <button id="recordBtn" class="control-btn">
+            <i class="fas fa-video"></i>
+        </button>
+    </div>
+</div>
+
+<div class="storage-meter">
+    <h6 class="mb-2">Storage Usage</h6>
+    <div class="progress">
+        <div id="storageBar" class="progress-bar" role="progressbar" style="width: 0%" 
+             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <small class="text-muted">100MB limit per IP address</small>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+{% endblock %}
