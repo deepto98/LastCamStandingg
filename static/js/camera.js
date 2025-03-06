@@ -77,6 +77,10 @@ class CameraApp {
     async switchCamera() {
         this.currentFacingMode = this.currentFacingMode === 'environment' ? 'user' : 'environment';
 
+        // Update video element classes for mirroring
+        this.videoElement.classList.remove('front-camera', 'rear-camera');
+        this.videoElement.classList.add(this.currentFacingMode === 'user' ? 'front-camera' : 'rear-camera');
+
         // Stop current stream
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
@@ -116,7 +120,7 @@ class CameraApp {
 
             const constraints = {
                 video: {
-                    facingMode: this.currentFacingMode, // Use preference instead of exact constraint
+                    facingMode: this.currentFacingMode,
                     aspectRatio: aspectRatio,
                     width: { ideal: isPortrait ? 1080 : 1920 },
                     height: { ideal: isPortrait ? 1440 : 1080 }
@@ -130,6 +134,10 @@ class CameraApp {
 
             this.videoElement.srcObject = this.stream;
             this.videoElement.muted = true; // Prevent audio feedback
+
+            // Set initial camera orientation class
+            this.videoElement.classList.remove('front-camera', 'rear-camera');
+            this.videoElement.classList.add(this.currentFacingMode === 'user' ? 'front-camera' : 'rear-camera');
 
             // Remove loader and enable buttons on success
             const loader = document.getElementById('cameraLoader');
@@ -215,22 +223,35 @@ class CameraApp {
 
     async capturePhoto() {
         if (!this.stream) {
-            this.showCameraPlaceholder('Camera not initialized');
+            this.showError('Camera not initialized');
             return;
         }
 
         try {
+            // Add capturing animation
+            this.captureBtn.classList.add('capturing');
+            setTimeout(() => this.captureBtn.classList.remove('capturing'), 300);
+
             const canvas = document.createElement('canvas');
             canvas.width = this.videoElement.videoWidth;
             canvas.height = this.videoElement.videoHeight;
-            canvas.getContext('2d').drawImage(this.videoElement, 0, 0);
+
+            const ctx = canvas.getContext('2d');
+
+            // If using front camera, flip the image horizontally before saving
+            if (this.currentFacingMode === 'user') {
+                ctx.scale(-1, 1);
+                ctx.translate(-canvas.width, 0);
+            }
+
+            ctx.drawImage(this.videoElement, 0, 0);
 
             canvas.toBlob(async (blob) => {
                 await this.uploadMedia(blob, 'image');
             }, 'image/jpeg', 0.95);
         } catch (error) {
             console.error('Error capturing photo:', error);
-            this.showCameraPlaceholder('Failed to capture photo');
+            this.showError('Failed to capture photo');
         }
     }
 

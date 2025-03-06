@@ -343,3 +343,32 @@ body {
 #switchCameraBtn:hover i {
   transform: rotate(180deg);
 }
+
+/* Add animation for photo capture */
+.control-btn.capture.capturing {
+  animation: flash 0.3s ease-out;
+}
+
+@keyframes flash {
+  0% { 
+    background: var(--accent-primary);
+    transform: scale(1);
+  }
+  50% { 
+    background: var(--accent-secondary);
+    transform: scale(1.2);
+  }
+  100% { 
+    background: var(--accent-primary);
+    transform: scale(1);
+  }
+}
+
+/* Add styles for front camera */
+#videoElement.front-camera {
+  transform: rotateY(180deg);
+}
+
+#videoElement.rear-camera {
+  transform: rotateY(0);
+}
