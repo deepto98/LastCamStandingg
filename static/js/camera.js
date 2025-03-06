@@ -8,6 +8,7 @@ class CameraApp {
         this.recordedChunks = [];
         this.isRecording = false;
         this.currentFacingMode = 'environment'; // Start with rear camera
+        this.storageManager = new StorageManager();
 
         // Disable buttons until camera is initialized
         this.captureBtn.disabled = true;
@@ -305,13 +306,29 @@ class CameraApp {
             const data = await response.json();
 
             if (response.ok) {
+                // Store the media ID in localStorage
+                const mediaId = data.url.split('/').pop();
+                try {
+                    const ids = JSON.parse(localStorage.getItem('lastCamMedia') || '[]');
+                    if (!ids.includes(mediaId)) {
+                        ids.push(mediaId);
+                        localStorage.setItem('lastCamMedia', JSON.stringify(ids));
+                    }
+                } catch (e) {
+                    console.error('Error storing media ID:', e);
+                }
+
+                // Update storage info
+                await this.storageManager.updateStorageInfo();
+
+                // Show success toast
                 this.showSuccess(data.url);
             } else {
                 throw new Error(data.error || 'Upload failed');
             }
         } catch (error) {
             console.error('Upload error:', error);
-            this.showCameraPlaceholder('Failed to upload media: ' + error.message);
+            this.showError('Failed to upload media: ' + error.message);
         }
     }
 
